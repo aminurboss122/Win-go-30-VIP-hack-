@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WinGo 30s - Double Sum Logic</title>
+    <style>
+        :root {
+            --bg: #0f122b;
+            --card: #1e244d;
+            --gold: #ffcf40;
+            --green: #4caf50;
+            --red: #f44336;
+            --violet: #9c27b0;
+            --blue: #2196f3;
+        }
+
+        body {
+            background: var(--bg);
+            color: #fff;
+            font-family: 'Roboto', sans-serif;
+            margin: 0;
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .main-layout {
+            display: flex;
+            gap: 10px;
+            width: 100%;
+            max-width: 480px;
+        }
+
+        .left-panel { flex: 1.8; }
+        .right-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .header-box {
+            background: var(--card);
+            width: 100%;
+            max-width: 480px;
+            padding: 12px;
+            border-radius: 10px;
+            margin-bottom: 10px;
+            border: 1px solid #3f4a91;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-sizing: border-box;
+        }
+
+        .timer-val {
+            font-size: 24px;
+            font-weight: 900;
+            color: var(--gold);
+        }
+
+        .pred-card {
+            background: var(--card);
+            padding: 15px;
+            border-radius: 12px;
+            text-align: center;
+            border: 2px solid var(--gold);
+            height: 170px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            box-sizing: border-box;
+            box-shadow: 0 0 15px rgba(255, 207, 64, 0.2);
+        }
+
+        #res-color {
+            font-size: 38px;
+            font-weight: 900;
+            margin: 5px 0;
+            text-transform: uppercase;
+        }
+
+        .counter-box {
+            background: var(--card);
+            padding: 8px;
+            border-radius: 8px;
+            border: 1px solid #3f4a91;
+            text-align: center;
+        }
+
+        .counter-label { font-size: 9px; color: #aaa; text-transform: uppercase; }
+        .counter-val { font-size: 16px; font-weight: bold; display: block; }
+
+        .history-wrap {
+            background: var(--card);
+            width: 100%;
+            max-width: 480px;
+            border-radius: 12px;
+            margin-top: 10px;
+            overflow: hidden;
+            border: 1px solid #3f4a91;
+        }
+
+        table { width: 100%; border-collapse: collapse; font-size: 11px; }
+        th { padding: 10px; background: #262d5e; color: #888; }
+        td { padding: 10px; border-bottom: 1px solid #ffffff0a; text-align: center; }
+
+        .n-circle {
+            width: 22px; height: 22px;
+            border-radius: 50%; display: inline-flex;
+            justify-content: center; align-items: center; font-weight: bold;
+        }
+
+        .scanning { animation: blink 0.5s infinite; color: var(--gold) !important; }
+        @keyframes blink { 50% { opacity: 0.2; } }
+        
+        .win-tag { color: var(--green); font-weight: bold; }
+        .jackpot-tag { color: var(--gold); font-weight: bold; text-shadow: 0 0 5px rgba(255,207,64,0.5); }
+        .loss-tag { color: var(--red); font-weight: bold; }
+    </style>
+</head>
+<body>
+
+<div class="header-box">
+    <div>
+        <small style="color:#aaa">PERIOD ID: <span id="p-id" style="color:#fff">----</span></small>
+    </div>
+    <div class="timer-val" id="timer">00:30</div>
+</div>
+
+<div class="main-layout">
+    <div class="left-panel">
+        <div class="pred-card">
+            <small id="logic-info" style="color:var(--blue); font-size: 9px; font-weight: bold;">DOUBLE SUM LOGIC ACTIVE</small>
+            <div id="res-color">--</div>
+            <div id="res-digit" style="color:#fff; font-size: 14px; font-weight: bold; background: rgba(0,0,0,0.3); padding: 5px 15px; border-radius: 20px; display: inline-block; margin: 5px auto; border: 1px solid rgba(255,255,255,0.1);">Number: --</div>
+            <div id="sum-process" style="font-size: 10px; color: #777;">Process: --</div>
+        </div>
+    </div>
+
+    <div class="right-panel">
+        <div class="counter-box"><span class="counter-label">Wins</span><span id="w-count" class="counter-val" style="color:var(--green)">0</span></div>
+        <div class="counter-box"><span class="counter-label">Loss</span><span id="l-count" class="counter-val" style="color:var(--red)">0</span></div>
+        <div class="counter-box"><span class="counter-label">Level</span><span id="lv-count" class="counter-val" style="color:var(--blue)">1</span></div>
+        <div class="counter-box"><span class="counter-label">Max LV</span><span id="ml-count" class="counter-val" style="color:var(--gold)">1</span></div>
+    </div>
+</div>
+
+<div class="history-wrap">
+    <table>
+        <thead>
+            <tr><th>Period</th><th>Number</th><th>Color</th><th>Result</th></tr>
+        </thead>
+        <tbody id="h-body"></tbody>
+    </table>
+</div>
+
+<script>
+    const API_URL = 'https://draw.ar-lottery01.com/WinGo/WinGo_30S/GetHistoryIssuePage.json?pageNo=1&pageSize=20';
+    let nID = "";
+    let memory = { w: 0, l: 0, lv: 1, ml: 1, last: null };
+    let historyResults = {};
+
+    function getSingleDigit(n) {
+        while (n >= 10) {
+            n = n.toString().split('').reduce((acc, digit) => acc + parseInt(digit), 0);
+        }
+        return n;
+    }
+
+    async function syncData() {
+        try {
+            const r = await fetch(API_URL);
+            const d = await r.json();
+            const list = d.data.list;
+            const latest = list[0];
+            
+            nID = (BigInt(latest.issueNumber) + 1n).toString();
+            document.getElementById('p-id').innerText = nID.slice(-4);
+
+            if (memory.last && memory.last.pid === latest.issueNumber) {
+                const actualNum = parseInt(latest.number);
+                let actualColor = actualNum % 2 === 0 ? "RED" : "GREEN";
+                if(actualNum === 0 || actualNum === 5) actualColor = "VIOLET";
+                
+                // Logic Check
+                const colorWin = (memory.last.color === actualColor || (actualColor === "VIOLET" && (memory.last.color === "RED" || memory.last.color === "GREEN")));
+                const numberWin = (memory.last.digit === actualNum);
+
+                if (colorWin) {
+                    memory.w++; memory.lv = 1;
+                    if (numberWin) {
+                        historyResults[latest.issueNumber] = '<span class="jackpot-tag">WIN+JACKPOT</span>';
+                    } else {
+                        historyResults[latest.issueNumber] = '<span class="win-tag">WIN</span>';
+                    }
+                } else {
+                    memory.l++; memory.lv++;
+                    if (memory.lv > memory.ml) memory.ml = memory.lv;
+                    historyResults[latest.issueNumber] = '<span class="loss-tag">LOSS</span>';
+                }
+                updateStats();
+                memory.last = null;
+            }
+            renderHistory(list);
+            return list;
+        } catch (e) { return null; }
+    }
+
+    function renderHistory(list) {
+        const body = document.getElementById('h-body');
+        body.innerHTML = "";
+        list.slice(0, 10).forEach(item => {
+            const num = parseInt(item.number);
+            const pNum = item.issueNumber;
+            let colorCode = num % 2 === 0 ? '#f44336' : '#4caf50';
+            let colorName = num % 2 === 0 ? 'RED' : 'GREEN';
+            if(num === 0 || num === 5) { colorCode = '#9c27b0'; colorName = 'VIOLET'; }
+            
+            const resultStatus = historyResults[pNum] || "-";
+            
+            body.innerHTML += `<tr>
+                <td>${pNum.slice(-3)}</td>
+                <td><span class="n-circle" style="background:${colorCode}">${num}</span></td>
+                <td style="color:${colorCode}; font-weight:bold;">${colorName}</td>
+                <td>${resultStatus}</td>
+            </tr>`;
+        });
+    }
+
+    function updateStats() {
+        document.getElementById('w-count').innerText = memory.w;
+        document.getElementById('l-count').innerText = memory.l;
+        document.getElementById('lv-count').innerText = memory.lv;
+        document.getElementById('ml-count').innerText = memory.ml;
+    }
+
+    async function run() {
+        const left = 30 - (new Date().getSeconds() % 30);
+        document.getElementById('timer').innerText = `00:${left < 10 ? '0' + left : left}`;
+
+        const colorTxt = document.getElementById('res-color');
+        const digitTxt = document.getElementById('res-digit');
+        const infoTxt = document.getElementById('logic-info');
+        const processTxt = document.getElementById('sum-process');
+
+        if (left <= 30 && left > 25) {
+            colorTxt.innerText = "WAITING";
+            colorTxt.className = "scanning";
+            colorTxt.style.color = "var(--gold)";
+            syncData();
+        }
+
+        if (left <= 25 && nID !== "" && !memory.last) {
+            const list = await syncData();
+            if (list) {
+                const latestNum = parseInt(list[0].number);
+                const windowSize = latestNum === 0 ? 10 : latestNum;
+                
+                let firstSum = 0;
+                for (let i = 0; i < windowSize; i++) {
+                    firstSum += parseInt(list[i].number);
+                }
+
+                const finalDigit = getSingleDigit(firstSum);
+                
+                let predColor = finalDigit % 2 === 0 ? "RED" : "GREEN";
+                let displayColor = predColor === "RED" ? "var(--red)" : "var(--green)";
+                
+                if (finalDigit === 0 || finalDigit === 5) {
+                    displayColor = "var(--violet)";
+                }
+                
+                memory.last = { pid: nID, color: predColor, digit: finalDigit };
+                
+                infoTxt.innerText = "WINDOW: " + windowSize + " | DOUBLE SUM MODE";
+                processTxt.innerText = "Sum: " + firstSum + " -> Final: " + finalDigit;
+                colorTxt.innerText = predColor;
+                colorTxt.className = "";
+                colorTxt.style.color = displayColor;
+                digitTxt.innerText = "Target Number: " + finalDigit;
+            }
+        }
+    }
+
+    setInterval(run, 1000);
+    syncData();
+</script>
+</body>
+</html>
